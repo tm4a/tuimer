@@ -1,4 +1,4 @@
-module tuimer
+module github.com/tm4a/tuimer
 
 go 1.25.5
 
