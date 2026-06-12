@@ -30,7 +30,7 @@ type Model struct {
 func NewModel(startSeconds int) Model {
 	m := Model{
 		InputBuffer:   "",
-		StopSoundChan: make(chan bool),
+		StopSoundChan: make(chan bool, 1),
 	}
 
 	if startSeconds > 0 {

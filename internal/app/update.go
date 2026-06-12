@@ -123,6 +123,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.Percent = 0
 			m.Finished = true
 			m.SoundPlaying = true
+			m.StopSoundChan = make(chan bool, 1)
 			go notification.Send("Tuimer", "Time is up!")
 			go audio.PlayAlarm(m.StopSoundChan)
 			return m, nil
