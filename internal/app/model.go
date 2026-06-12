@@ -1,6 +1,8 @@
 package app
 
 import (
+	"time"
+
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/tm4a/tuimer/internal/timer"
 )
@@ -19,6 +21,10 @@ type Model struct {
 	Paused        bool
 	StopSoundChan chan bool
 	SoundPlaying  bool
+
+	Deadline        time.Time
+	PausedRemaining time.Duration
+	TickID          int
 }
 
 func NewModel(startSeconds int) Model {
@@ -32,6 +38,8 @@ func NewModel(startSeconds int) Model {
 		m.Duration = startSeconds
 		m.TimeLeft = startSeconds
 		m.Percent = 1.0
+		m.Deadline = time.Now().Add(time.Duration(startSeconds) * time.Second)
+		m.TickID = 1
 	} else {
 		m.InputMode = true
 	}
@@ -41,7 +49,7 @@ func NewModel(startSeconds int) Model {
 
 func (m Model) Init() tea.Cmd {
 	if !m.InputMode {
-		return timer.Tick()
+		return timer.Tick(m.TickID, m.Deadline)
 	}
 	return nil
 }

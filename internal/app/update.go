@@ -1,6 +1,9 @@
 package app
 
 import (
+	"math"
+	"time"
+
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/tm4a/tuimer/internal/audio"
 	"github.com/tm4a/tuimer/internal/notification"
@@ -46,15 +49,21 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.Duration = 0
 				m.TimeLeft = 0
 				m.Percent = 0
+				m.TickID++
 				return m, nil
 			}
 
 		case " ":
 			if !m.InputMode && !m.Finished {
-				m.Paused = !m.Paused
-				if !m.Paused {
-					return m, timer.Tick()
+				if m.Paused {
+					m.Paused = false
+					m.Deadline = time.Now().Add(m.PausedRemaining)
+					m.TickID++
+					return m, timer.Tick(m.TickID, m.Deadline)
 				}
+				m.Paused = true
+				m.PausedRemaining = time.Until(m.Deadline)
+				m.TickID++
 			}
 
 		case "enter":
@@ -77,6 +86,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.Duration = 0
 				m.TimeLeft = 0
 				m.Percent = 0
+				m.TickID++
 				return m, nil
 			}
 
@@ -104,20 +114,22 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 	case timer.TickMsg:
-		if m.Paused {
+		if msg.ID != m.TickID || m.InputMode || m.Paused || m.Finished {
 			return m, nil
 		}
-		if !m.InputMode && m.TimeLeft > 0 {
-			m.TimeLeft--
-			m.Percent = float64(m.TimeLeft) / float64(m.Duration)
-			return m, timer.Tick()
-		} else if !m.InputMode && m.TimeLeft == 0 && !m.Finished {
+		remaining := time.Until(m.Deadline)
+		if remaining <= 0 {
+			m.TimeLeft = 0
+			m.Percent = 0
 			m.Finished = true
 			m.SoundPlaying = true
 			go notification.Send("Tuimer", "Time is up!")
 			go audio.PlayAlarm(m.StopSoundChan)
 			return m, nil
 		}
+		m.TimeLeft = int(math.Ceil(remaining.Seconds()))
+		m.Percent = float64(m.TimeLeft) / float64(m.Duration)
+		return m, timer.Tick(m.TickID, m.Deadline)
 	}
 
 	return m, nil
@@ -127,6 +139,9 @@ func (m Model) startTimer(seconds int) (Model, tea.Cmd) {
 	m.Duration = seconds
 	m.TimeLeft = seconds
 	m.InputMode = false
+	m.Paused = false
 	m.Percent = 1.0
-	return m, timer.Tick()
+	m.Deadline = time.Now().Add(time.Duration(seconds) * time.Second)
+	m.TickID++
+	return m, timer.Tick(m.TickID, m.Deadline)
 }
