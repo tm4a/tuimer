@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/gopxl/beep/v2"
@@ -11,6 +12,12 @@ import (
 	"github.com/gopxl/beep/v2/speaker"
 	"github.com/gopxl/beep/v2/vorbis"
 	"github.com/gopxl/beep/v2/wav"
+)
+
+var (
+	initOnce   sync.Once
+	initErr    error
+	deviceRate beep.SampleRate
 )
 
 func PlayAlarm(stopChan chan bool) {
@@ -59,8 +66,21 @@ func PlayAlarm(stopChan chan bool) {
 	}
 	defer streamer.Close()
 
-	speaker.Init(format.SampleRate, format.SampleRate.N(time.Second/10))
-	loop := beep.Loop(-1, streamer)
+	initOnce.Do(func() {
+		deviceRate = format.SampleRate
+		initErr = speaker.Init(deviceRate, deviceRate.N(time.Second/10))
+	})
+	if initErr != nil {
+		return
+	}
+
+	loop, err := beep.Loop2(streamer)
+	if err != nil {
+		return
+	}
+	if format.SampleRate != deviceRate {
+		loop = beep.Resample(4, format.SampleRate, deviceRate, loop)
+	}
 	ctrl := &beep.Ctrl{Streamer: loop, Paused: false}
 	speaker.Play(ctrl)
 
