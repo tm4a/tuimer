@@ -14,23 +14,47 @@ func (m Model) View() string {
 		return ""
 	}
 
-	var timeStr string
+	var rawTime string
+	var style lipgloss.Style
+	paused := false
+
 	if m.InputMode {
-		timeStr = timer.FormatBuffer(m.InputBuffer)
-		timeStr = ui.TimeStyle.Render(timeStr)
+		rawTime = timer.FormatBuffer(m.InputBuffer)
+		style = ui.TimeStyle
 	} else {
 		h := m.TimeLeft / 3600
 		min := (m.TimeLeft % 3600) / 60
 		sec := m.TimeLeft % 60
 
-		rawTime := fmt.Sprintf("%02d:%02d:%02d", h, min, sec)
+		rawTime = fmt.Sprintf("%02d:%02d:%02d", h, min, sec)
 
-		if m.Finished {
-			timeStr = ui.AlarmStyle.Render(rawTime)
-		} else if m.Paused {
-			timeStr = ui.PausedStyle.Render(rawTime + " [PAUSED]")
-		} else {
-			timeStr = ui.TimeStyle.Render(rawTime)
+		switch {
+		case m.Finished:
+			style = ui.AlarmStyle
+		case m.Paused:
+			style = ui.PausedStyle
+			paused = true
+		default:
+			style = ui.TimeStyle
+		}
+	}
+
+	// Small rendering
+	small := rawTime
+	if paused {
+		small += " [PAUSED]"
+	}
+	timeStr := style.Render(small)
+
+	// Big clock rendering when the terminal is comfortably large
+	if m.Width >= 40 && m.Height >= 9 {
+		big := ui.BigText(rawTime)
+		if lipgloss.Width(big) <= m.Width {
+			bigStr := style.Render(big)
+			if paused {
+				bigStr = lipgloss.JoinVertical(lipgloss.Center, bigStr, ui.PausedStyle.Render("[PAUSED]"))
+			}
+			timeStr = bigStr
 		}
 	}
 
